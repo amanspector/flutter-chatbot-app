@@ -8,6 +8,7 @@ import 'package:chatbot_app/screens/background/animated_mesh_background.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:lottie/lottie.dart';
@@ -22,9 +23,10 @@ class Homescreen extends StatefulWidget {
 
 class _StateHomescreen extends State<Homescreen> {
   String uid = FirebaseAuth.instance.currentUser!.uid;
-  TextEditingController controller = TextEditingController();
+  TextEditingController inputcontroller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   bool showSecond = false;
+  final FocusNode _focus = FocusNode();
 
   @override
   void initState() {
@@ -33,12 +35,18 @@ class _StateHomescreen extends State<Homescreen> {
 
   @override
   void dispose() {
-    controller.dispose();
+    inputcontroller.dispose();
     _scrollController.dispose();
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
     super.dispose();
   }
 
-  // void scrollToBottom() {
+  // void scrollToBottomWhileSend() {
   //   if (_scrollController.hasClients) {
   //     Future.delayed(Duration(milliseconds: 300), () {
   //       if (_scrollController.hasClients) {
@@ -116,13 +124,13 @@ class _StateHomescreen extends State<Homescreen> {
                       CircleAvatar(
                         backgroundColor: ColorConstant.color_blueDark_shade,
                         child: Text(
-                          gmail?.toUpperCase()[0] ?? "U",
+                          gmail?.toUpperCase()[0] ?? " ",
                           style: TextStyle(fontSize: 20),
                         ),
                       ),
                       SizedBox(width: 12),
                       Text(
-                        gmail ?? "Not found",
+                        gmail ?? Textconstant.txt_notfound,
                         style: TextStyle(fontSize: 16),
                       ),
                     ],
@@ -145,12 +153,12 @@ class _StateHomescreen extends State<Homescreen> {
               onTap: () {
                 provider.resetChat();
                 Navigator.pop(context);
+                _focus.requestFocus();
               },
             ),
 
             Divider(),
 
-            // Chat history
             Expanded(
               child: StreamBuilder(
                 stream: provider.getChatList(uid),
@@ -166,6 +174,7 @@ class _StateHomescreen extends State<Homescreen> {
                   }
 
                   return ListView.builder(
+                    physics: ScrollPhysics(),
                     itemCount: chats.length,
                     itemBuilder: (context, index) {
                       final chat = chats[index];
@@ -186,14 +195,28 @@ class _StateHomescreen extends State<Homescreen> {
                                 style: TextStyle(fontSize: 12),
                               )
                             : null,
-                        trailing: IconButton(
-                          icon: Icon(Icons.delete_outline, size: 20),
-                          onPressed: () {
-                            provider.deleteChat(uid, chatId);
-                          },
-                        ),
+                        trailing: provider.deletingChatId == chatId
+                            ? Padding(
+                                padding: const EdgeInsets.all(10.0),
+                                child: SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(),
+                                ),
+                              )
+                            : IconButton(
+                                icon: Icon(Icons.delete_outline, size: 20),
+                                onPressed: () {
+                                  provider.deleteChat(uid, chatId);
+                                  // Navigator.pop(context);
+                                },
+                              ),
                         onTap: () {
+                          if (provider.deletingChatId == chatId) {
+                            return;
+                          }
                           provider.loadChat(uid, chatId);
+                          _focus.unfocus();
                           Navigator.pop(context);
                         },
                       );
@@ -229,6 +252,7 @@ class _StateHomescreen extends State<Homescreen> {
                       return IconButton(
                         onPressed: () {
                           Scaffold.of(con).openDrawer();
+                          _focus.unfocus();
                         },
                         icon: Icon(Icons.list),
                       );
@@ -242,6 +266,8 @@ class _StateHomescreen extends State<Homescreen> {
                     onPressed: () {
                       final provider = context.read<MessageProvider>();
                       provider.resetChat();
+                      _focus.requestFocus();
+                      setState(() {});
                     },
                     icon: Icon(Icons.add),
                   ),
@@ -274,29 +300,32 @@ class _StateHomescreen extends State<Homescreen> {
           scrollToBottom();
         });
 
-        return ListView.builder(
-          padding: const EdgeInsets.only(top: 50, bottom: 60),
-          controller: _scrollController,
-          itemCount: docs.length + (provider.isStreaming ? 1 : 0),
-          itemBuilder: (context, index) {
-            if (provider.isStreaming && index == docs.length) {
-              return _buildStreamingBubble(provider);
-            }
-
-            final data = docs[index].data() as Map<String, dynamic>;
-            final isUser = data['isUser'] ?? false;
-            final content = data['content'] ?? '';
-            final messageId = docs[index].id;
-
-            if (!isUser && content.isEmpty) {
-              if (provider.isStreaming &&
-                  provider.streamingMessageId == messageId) {
-                return SizedBox.shrink(); // Don't show empty placeholder
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(40),
+          child: ListView.builder(
+            padding: const EdgeInsets.only(top: 50, bottom: 70),
+            controller: _scrollController,
+            itemCount: docs.length + (provider.isStreaming ? 1 : 0),
+            itemBuilder: (context, index) {
+              if (provider.isStreaming && index == docs.length) {
+                return _buildStreamingBubble(provider);
               }
-            }
 
-            return _buildMessageBubble(isUser, content);
-          },
+              final data = docs[index].data() as Map<String, dynamic>;
+              final isUser = data['isUser'] ?? false;
+              final content = data['content'] ?? '';
+              final messageId = docs[index].id;
+
+              if (!isUser && content.isEmpty) {
+                if (provider.isStreaming &&
+                    provider.streamingMessageId == messageId) {
+                  return SizedBox.shrink(); // Don't show empty placeholder
+                }
+              }
+
+              return _buildMessageBubble(isUser, content);
+            },
+          ),
         );
       },
     );
@@ -305,42 +334,72 @@ class _StateHomescreen extends State<Homescreen> {
   Widget _buildStreamingBubble(MessageProvider provider) {
     final hasText = provider.streamingText.isNotEmpty;
 
-    return hasText
-        ? GestureDetector(
-            behavior: HitTestBehavior.opaque,
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        child: hasText
+            ? GestureDetector(
+                behavior: HitTestBehavior.opaque,
 
-            onTap: () {
-              print("---------------------tapped");
-              provider.skipAnimation();
-            },
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                onDoubleTap: () {
+                  print("---------------------tapped");
+                  provider.skipAnimation();
+                },
+
+                onLongPress: () async {
+                  final text = provider.streamingText.trim();
+                  print("COPYING: $text");
+                  if (text.isEmpty) return;
+                  await Clipboard.setData(ClipboardData(text: text));
+
+                  ScaffoldMessenger.of(context)
+                    ..clearSnackBars()
+                    ..showSnackBar(
+                      SnackBar(
+                        behavior: SnackBarBehavior.floating,
+                        margin: EdgeInsets.only(
+                          bottom: MediaQuery.heightOf(context) / 2 - 30,
+                          left: 20,
+                          right: 20,
+                        ),
+                        content: SizedBox(
+                          width: MediaQuery.widthOf(context),
+                          child: Text(
+                            Textconstant.txt_copied,
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10.0),
+                        ),
+
+                        duration: Duration(seconds: 1),
+                      ),
+                    );
+                },
+
                 child: Container(
                   constraints: BoxConstraints(
-                    maxWidth: MediaQuery.of(context).size.width * 0.75,
+                    maxWidth: MediaQuery.of(context).size.width,
                   ),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(20),
                     color: ColorConstant.color_darkblueshade150,
                   ),
                   padding: EdgeInsets.all(14),
-                  child: AbsorbPointer(
-                    absorbing: provider.isStreaming,
-                    child: MarkdownBody(
-                      data: provider.streamingText,
-                      selectable: true,
-                      styleSheet: MarkdownStyleSheet.fromTheme(
-                        Theme.of(context),
-                      ).copyWith(p: const TextStyle(fontSize: 15)),
-                    ),
+                  child: MarkdownBody(
+                    data: provider.streamingText,
+
+                    styleSheet: MarkdownStyleSheet.fromTheme(
+                      Theme.of(context),
+                    ).copyWith(p: const TextStyle(fontSize: 15)),
                   ),
                 ),
-              ),
-            ),
-          )
-        : _buildTypingIndicator();
+              )
+            : _buildTypingIndicator(),
+      ),
+    );
   }
 
   /// Build regular message bubble (saved in Firebase)
@@ -349,30 +408,61 @@ class _StateHomescreen extends State<Homescreen> {
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
       child: Padding(
         padding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        child: Container(
-          constraints: BoxConstraints(
-            maxWidth: MediaQuery.of(context).size.width * 0.75,
-          ),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            color: isUser
-                ? ColorConstant.color_darkblueshade200
-                : ColorConstant.color_darkblueshade150,
-          ),
-          padding: EdgeInsets.all(14),
-          child: MarkdownBody(
-            data: content,
-            selectable: true,
-            styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context))
-                .copyWith(
-                  h3: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+        child: GestureDetector(
+          onLongPress: () async {
+            print("COPYING: $content");
+            if (content.isEmpty) return;
+            await Clipboard.setData(ClipboardData(text: content));
+            ScaffoldMessenger.of(context)
+              ..clearSnackBars()
+              ..showSnackBar(
+                SnackBar(
+                  behavior: SnackBarBehavior.floating,
+                  margin: EdgeInsets.only(
+                    bottom: MediaQuery.heightOf(context) / 2 - 30,
+                    left: 20,
+                    right: 20,
                   ),
-                  p: const TextStyle(fontSize: 15),
-                  strong: const TextStyle(fontWeight: FontWeight.bold),
-                  em: const TextStyle(fontStyle: FontStyle.italic),
+                  content: SizedBox(
+                    width: MediaQuery.widthOf(context),
+                    child: Text(
+                      Textconstant.txt_copied,
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10.0),
+                  ),
+                  duration: Duration(seconds: 1),
                 ),
+              );
+          },
+
+          child: Container(
+            constraints: BoxConstraints(
+              maxWidth: MediaQuery.of(context).size.width,
+            ),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              color: isUser
+                  ? ColorConstant.color_darkblueshade200
+                  : ColorConstant.color_darkblueshade150,
+            ),
+            padding: EdgeInsets.all(14),
+            child: MarkdownBody(
+              data: content,
+              selectable: false,
+              styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context))
+                  .copyWith(
+                    h3: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    p: const TextStyle(fontSize: 15),
+                    strong: const TextStyle(fontWeight: FontWeight.bold),
+                    em: const TextStyle(fontStyle: FontStyle.italic),
+                  ),
+            ),
           ),
         ),
       ),
@@ -392,6 +482,7 @@ class _StateHomescreen extends State<Homescreen> {
 
   Widget _buildBottomBar(MessageProvider provider) {
     final isStreaming = provider.isStreaming;
+    final isDisabled = provider.isSendingCooldown;
 
     return Positioned(
       bottom: 4,
@@ -403,16 +494,23 @@ class _StateHomescreen extends State<Homescreen> {
           child: LiquidGlass(
             shape: LiquidRoundedSuperellipse(borderRadius: 20),
             child: Container(
-              padding: const EdgeInsets.all(8.0),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 20.0,
+                vertical: 8,
+              ),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(30),
               ),
               child: Row(
+                mainAxisAlignment: MainAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Flexible(
                     child: TextFormField(
-                      controller: controller,
-                      maxLines: null,
+                      focusNode: _focus,
+                      controller: inputcontroller,
+                      minLines: 1,
+                      maxLines: 15,
                       enabled: !isStreaming,
                       decoration: InputDecoration(
                         border: UnderlineInputBorder(
@@ -421,11 +519,14 @@ class _StateHomescreen extends State<Homescreen> {
                         hintText: Textconstant.txt_askevrything,
                         hintStyle: TextStyle(fontFamily: 'InstrumentSerif'),
                       ),
-                      onFieldSubmitted: (_) => _sendMessage(provider),
                     ),
                   ),
                   IconButton(
-                    onPressed: () => _sendMessage(provider),
+                    onPressed: isDisabled
+                        ? null
+                        : () async {
+                            await _sendMessage(provider);
+                          },
                     icon: Icon(isStreaming ? Icons.stop : Icons.send),
                   ),
                 ],
@@ -437,7 +538,7 @@ class _StateHomescreen extends State<Homescreen> {
     );
   }
 
-  void _sendMessage(MessageProvider provider) async {
+  Future<void> _sendMessage(MessageProvider provider) async {
     // If streaming, stop it
     if (provider.isStreaming) {
       await provider.stopGeneration();
@@ -445,11 +546,11 @@ class _StateHomescreen extends State<Homescreen> {
     }
 
     // Get text and validate
-    final text = controller.text.trim();
-    if (text.isEmpty) return;
+    final text = inputcontroller.text.trim();
+    if (text.isEmpty || provider.isSendingCooldown) return;
 
     // Clear and unfocus
-    controller.clear();
+    inputcontroller.clear();
     FocusScope.of(context).unfocus();
 
     // Send message

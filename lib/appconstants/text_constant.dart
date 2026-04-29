@@ -13,7 +13,9 @@ class Textconstant {
   static String txt_welcomeback = "Welcome back";
   static String txt_registersucess = "Register successfully ";
   static String txt_register = "Register";
+  static String txt_copied = "Copied";
   static String txt_login = 'Login';
   static String txt_alreadyhaveanaccount = "already have an account ?";
   static String txt_donthaveaccount = "don't have an account ?";
+  static String txt_notfound = "Not found";
 }

@@ -196,7 +196,12 @@ class _LoginscreenState extends State<Loginscreen> {
                               Text(Textconstant.txt_donthaveaccount),
                               TextButton(
                                 onPressed: () {
-                                  Navigator.pop(context);
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => Registerscreen(),
+                                    ),
+                                  );
                                 },
                                 style: TextButton.styleFrom(
                                   padding: EdgeInsets.zero,

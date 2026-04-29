@@ -1,4 +1,3 @@
-import 'package:chatbot_app/models/message_model.dart';
 import 'package:chatbot_app/repository/gemini_repo.dart';
 import 'package:chatbot_app/services/firebase_chat_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -13,31 +12,40 @@ class MessageProvider extends ChangeNotifier {
 
   String? streamingMessageId;
   String streamingText = "";
+  bool isSendingCooldown = false;
   bool isTyping = false;
   bool isStreaming = false;
   bool isStopped = false;
   bool isSkipped = false;
   String? currentChatId;
-  int speedinms = 50; // Changed default speed
+  int speedinms = 50;
+  String? deletingChatId;
 
   Future<void> sendMessage(String text, String uid) async {
+    if (isSendingCooldown) return;
+
+    isSendingCooldown = true;
+    notifyListeners();
+
+    Future.delayed(const Duration(seconds: 2), () {
+      isSendingCooldown = false;
+      notifyListeners();
+    });
+
     try {
-      // Create chat if doesn't exist
       if (currentChatId == null) {
         currentChatId = await service.createChat(uid);
         notifyListeners();
       }
 
-      // Set streaming state
       isStreaming = true;
       isTyping = true;
       isStopped = false;
       isSkipped = false;
       streamingText = "";
-      streamingMessageId = null;
+      streamingMessageId = "temp";
       notifyListeners();
 
-      // Save user message
       await service.sendMessage(
         uid: uid,
         chatid: currentChatId!,
@@ -45,32 +53,35 @@ class MessageProvider extends ChangeNotifier {
         isUser: true,
       );
 
-      // Create empty AI message placeholder
-      final aiMessageId = await service.sendMessage(
-        uid: uid,
-        chatid: currentChatId!,
-        content: "",
-        isUser: false,
-      );
-
-      streamingMessageId = aiMessageId;
-      notifyListeners();
-
       final reply = await repo.sendMessage(text);
 
       if (isStopped) {
+        streamingText = "";
+        streamingMessageId = null;
+        isStreaming = false;
+        notifyListeners();
         return;
       }
+
       String current = "";
       final words = reply.split(" ");
-      int c = 0;
 
       for (int i = 0; i < words.length; i++) {
         if (isStopped) {
+          streamingText = ""; // Clear FIRST
           streamingMessageId = null;
-          streamingText = "";
           isStreaming = false;
+          isTyping = false;
           notifyListeners();
+          // Save what we have so far
+          if (current.isNotEmpty) {
+            await service.sendMessage(
+              uid: uid,
+              chatid: currentChatId!,
+              content: current,
+              isUser: false,
+            );
+          }
           return;
         }
 
@@ -82,14 +93,10 @@ class MessageProvider extends ChangeNotifier {
         }
 
         current += (i == 0) ? words[i] : " ${words[i]}";
-        c++;
+        streamingText = current;
+        notifyListeners();
 
-        if (c % 3 == 0) {
-          streamingText = current;
-          notifyListeners();
-        }
-
-        await Future.delayed(Duration(milliseconds: 50));
+        await Future.delayed(Duration(milliseconds: 10));
 
         if (isSkipped) {
           current = reply;
@@ -99,32 +106,24 @@ class MessageProvider extends ChangeNotifier {
         }
       }
 
-      // Only update Firebase if not stopped
       if (!isStopped) {
-        await service.updateMessage(
-          uid: uid,
-          chatid: currentChatId!,
-          messageId: aiMessageId,
-          content: current,
-        );
-        // Clear streaming state
+        streamingText = "";
         streamingMessageId = null;
         isTyping = false;
         isStreaming = false;
         notifyListeners();
+        await service.sendMessage(
+          uid: uid,
+          chatid: currentChatId!,
+          content: current,
+          isUser: false,
+        );
+        streamingText = "";
       }
     } catch (e) {
       print("Error in sendMessage: $e");
 
-      // Save error message
-      if (currentChatId != null && streamingMessageId != null) {
-        await service.updateMessage(
-          uid: uid,
-          chatid: currentChatId!,
-          messageId: streamingMessageId!,
-          content: "Error: $e",
-        );
-      } else {
+      if (currentChatId != null) {
         await service.sendMessage(
           uid: uid,
           chatid: currentChatId!,
@@ -132,7 +131,7 @@ class MessageProvider extends ChangeNotifier {
           isUser: false,
         );
       }
-      // Clear streaming state
+
       streamingText = "";
       streamingMessageId = null;
       isTyping = false;
@@ -163,26 +162,10 @@ class MessageProvider extends ChangeNotifier {
   Future<void> stopGeneration() async {
     repo.stopSending();
     isStopped = true;
-    if (streamingMessageId != null && currentChatId != null) {
-      try {
-        String contentToSave = streamingText.isNotEmpty
-            ? streamingText
-            : "[Stopped]"; // Or just empty string ""
-
-        await service.updateMessage(
-          uid: FirebaseAuth.instance.currentUser!.uid,
-          chatid: currentChatId!,
-          messageId: streamingMessageId!,
-          content: contentToSave,
-        );
-      } catch (e) {
-        print("Error updating message: $e");
-      }
-    }
-
     isTyping = false;
     isStreaming = false;
-    streamingText = "";
+
+    // streamingText = "";
     streamingMessageId = null;
     notifyListeners();
   }
@@ -254,9 +237,15 @@ class MessageProvider extends ChangeNotifier {
 
   /// Delete a chat
   Future<void> deleteChat(String uid, String chatId) async {
+    deletingChatId = chatId;
+    notifyListeners();
+
     await service.deleteChat(uid, chatId);
     if (currentChatId == chatId) {
       resetChat();
     }
+
+    deletingChatId = null;
+    notifyListeners();
   }
 }

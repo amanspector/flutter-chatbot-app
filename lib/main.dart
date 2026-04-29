@@ -3,8 +3,8 @@ import 'package:chatbot_app/provider/cred_provider.dart';
 import 'package:chatbot_app/repository/gemini_repo.dart';
 import 'package:chatbot_app/screens/auth/authgate.dart';
 import 'package:chatbot_app/services/firebase_chat_service.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'firebase_options.dart';
 import 'package:provider/provider.dart';
@@ -15,6 +15,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: '.env');
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   final repo = GeminiRepo();
 
   runApp(MyApp(repo: repo));

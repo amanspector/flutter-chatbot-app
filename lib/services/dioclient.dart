@@ -1,7 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
-final _apikey = dotenv.env['API_KEY'];
+// final _apikey = dotenv.env['API_KEY'];
 final _baseurl = dotenv.env['BASE_URL'];
 
 class Dioclient {

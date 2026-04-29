@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:chatbot_app/services/dioclient.dart';
 import 'package:dio/dio.dart';
@@ -32,7 +31,7 @@ class GeminiRepo {
       return res.data["candidates"][0]["content"]["parts"][0]["text"];
     } on DioException catch (e) {
       if (CancelToken.isCancel(e)) {
-        throw Exception("CANCELLED");
+        throw ("CANCELLED");
       }
 
       if (e.response != null) {

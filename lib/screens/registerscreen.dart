@@ -1,6 +1,7 @@
 import 'package:chatbot_app/appconstants/color_constant.dart';
 import 'package:chatbot_app/appconstants/text_constant.dart';
 import 'package:chatbot_app/provider/cred_provider.dart';
+import 'package:chatbot_app/screens/auth/authgate.dart';
 import 'package:chatbot_app/screens/background/animated_mesh_background.dart';
 import 'package:chatbot_app/screens/loginscreen.dart';
 import 'package:chatbot_app/services/firebase_auth_service.dart';
@@ -227,6 +228,16 @@ class _RegisterscreenState extends State<Registerscreen> {
                                           ),
                                         ),
                                       );
+
+                                      if (cred == null) {
+                                        Navigator.pushAndRemoveUntil(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) => Authgate(),
+                                          ),
+                                          (route) => false,
+                                        );
+                                      }
                                     }
                                   } catch (e) {
                                     ScaffoldMessenger.of(context).showSnackBar(
@@ -260,12 +271,7 @@ class _RegisterscreenState extends State<Registerscreen> {
                               Text(Textconstant.txt_alreadyhaveanaccount),
                               TextButton(
                                 onPressed: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => Loginscreen(),
-                                    ),
-                                  );
+                                  Navigator.pop(context);
                                 },
                                 style: TextButton.styleFrom(
                                   padding: EdgeInsets.zero,
