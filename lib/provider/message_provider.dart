@@ -18,8 +18,11 @@ class MessageProvider extends ChangeNotifier {
   bool isStopped = false;
   bool isSkipped = false;
   String? currentChatId;
+  String? editChatId;
+  TextEditingController? editChatNameController;
   int speedinms = 50;
   String? deletingChatId;
+  FocusNode? editfocusnode;
 
   Future<void> sendMessage(String text, String uid) async {
     if (isSendingCooldown) return;
@@ -31,6 +34,8 @@ class MessageProvider extends ChangeNotifier {
       isSendingCooldown = false;
       notifyListeners();
     });
+
+    String? chatIdForThisMessage;
 
     try {
       if (currentChatId == null) {
@@ -45,10 +50,11 @@ class MessageProvider extends ChangeNotifier {
       streamingText = "";
       streamingMessageId = "temp";
       notifyListeners();
+      chatIdForThisMessage = currentChatId!;
 
       await service.sendMessage(
         uid: uid,
-        chatid: currentChatId!,
+        chatid: chatIdForThisMessage,
         content: text,
         isUser: true,
       );
@@ -77,7 +83,7 @@ class MessageProvider extends ChangeNotifier {
           if (current.isNotEmpty) {
             await service.sendMessage(
               uid: uid,
-              chatid: currentChatId!,
+              chatid: chatIdForThisMessage,
               content: current,
               isUser: false,
             );
@@ -112,9 +118,14 @@ class MessageProvider extends ChangeNotifier {
         isTyping = false;
         isStreaming = false;
         notifyListeners();
+
+        // CHECK: If chat was deleted, don't save
+        if (deletingChatId == chatIdForThisMessage) {
+          return; // Exit, chat is being deleted
+        }
         await service.sendMessage(
           uid: uid,
-          chatid: currentChatId!,
+          chatid: chatIdForThisMessage,
           content: current,
           isUser: false,
         );
@@ -123,10 +134,11 @@ class MessageProvider extends ChangeNotifier {
     } catch (e) {
       print("Error in sendMessage: $e");
 
-      if (currentChatId != null) {
+      if (chatIdForThisMessage != null &&
+          deletingChatId != chatIdForThisMessage) {
         await service.sendMessage(
           uid: uid,
-          chatid: currentChatId!,
+          chatid: chatIdForThisMessage,
           content: "Error: $e",
           isUser: false,
         );
@@ -235,15 +247,49 @@ class MessageProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  void startEditChat(String chatId, String currentTitle) {
+    editChatId = chatId;
+    editfocusnode = FocusNode();
+    editChatNameController = TextEditingController(text: currentTitle);
+    notifyListeners();
+  }
+
+  void cancelEditChat() {
+    editChatId = null;
+    editChatNameController?.dispose();
+    editChatNameController = null;
+    editfocusnode?.dispose();
+    notifyListeners();
+  }
+
+  Future<void> saveEditChat(String uid, String chatId) async {
+    if (editChatNameController?.text.trim().isEmpty ?? true) {
+      cancelEditChat();
+      return;
+    }
+    await service.updateChatTitle(
+      uid,
+      chatId,
+      editChatNameController!.text.trim(),
+    );
+    editChatNameController?.dispose();
+    editfocusnode?.dispose();
+    editChatNameController = null;
+    editfocusnode = null;
+
+    editChatId = null;
+    notifyListeners();
+  }
+
   /// Delete a chat
   Future<void> deleteChat(String uid, String chatId) async {
     deletingChatId = chatId;
     notifyListeners();
 
-    await service.deleteChat(uid, chatId);
     if (currentChatId == chatId) {
       resetChat();
     }
+    await service.deleteChat(uid, chatId);
 
     deletingChatId = null;
     notifyListeners();

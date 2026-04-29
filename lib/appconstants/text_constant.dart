@@ -15,6 +15,9 @@ class Textconstant {
   static String txt_register = "Register";
   static String txt_copied = "Copied";
   static String txt_login = 'Login';
+  static String txt_edit = 'Edit';
+  static String txt_delete = 'Delete';
+  static String txt_newchat = 'New Chat';
   static String txt_alreadyhaveanaccount = "already have an account ?";
   static String txt_donthaveaccount = "don't have an account ?";
   static String txt_notfound = "Not found";

@@ -141,6 +141,19 @@ class FirebaseChatService {
   /// Delete a specific chat
   Future<void> deleteChat(String uid, String chatId) async {
     try {
+      // Delete all messages in the chat
+      final messages = await _firestore
+          .collection('users')
+          .doc(uid)
+          .collection('chats')
+          .doc(chatId)
+          .collection('messages')
+          .get();
+
+      for (var doc in messages.docs) {
+        await doc.reference.delete();
+      }
+
       // Delete the chat document
       await _firestore
           .collection('users')

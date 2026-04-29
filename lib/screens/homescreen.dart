@@ -83,6 +83,11 @@ class _StateHomescreen extends State<Homescreen> {
 
     return Scaffold(
       drawer: _buildDrawer(gmail),
+      onDrawerChanged: (isOpened) {
+        if (!isOpened && provider.editChatId != null) {
+          provider.cancelEditChat();
+        }
+      },
       backgroundColor: ColorConstant.color_darkblueshade500,
       body: Stack(
         children: [
@@ -109,7 +114,8 @@ class _StateHomescreen extends State<Homescreen> {
     final provider = context.read<MessageProvider>();
 
     return Drawer(
-      surfaceTintColor: ColorConstant.color_darkblueshade200,
+      width: MediaQuery.widthOf(context),
+      backgroundColor: ColorConstant.color_darkblueshade200,
       child: SafeArea(
         child: Column(
           children: [
@@ -149,7 +155,7 @@ class _StateHomescreen extends State<Homescreen> {
             // New Chat button
             ListTile(
               leading: Icon(Icons.add_circle_outline),
-              title: Text('New Chat'),
+              title: Text(Textconstant.txt_newchat),
               onTap: () {
                 provider.resetChat();
                 Navigator.pop(context);
@@ -182,13 +188,48 @@ class _StateHomescreen extends State<Homescreen> {
                       final data = chat.data() as Map<String, dynamic>;
                       final timestamp = data['timestamp'] as Timestamp?;
 
+                      final title =
+                          data['title'] ?? 'Chat ${chats.length - index}';
+
                       return ListTile(
                         selected: provider.currentChatId == chatId,
                         leading: Icon(Icons.chat_bubble_outline),
-                        title: Text(
-                          'Chat ${chats.length - index}',
-                          style: TextStyle(fontSize: 14),
-                        ),
+                        title: provider.editChatId == chatId
+                            ? Row(
+                                children: [
+                                  Flexible(
+                                    flex: 7,
+                                    child: TextFormField(
+                                      focusNode: provider.editfocusnode,
+                                      autofocus: true,
+                                      controller:
+                                          provider.editChatNameController,
+
+                                      onFieldSubmitted: (value) {
+                                        provider.saveEditChat(uid, chatId);
+                                      },
+                                      decoration: InputDecoration(
+                                        isDense: true,
+                                      ),
+                                    ),
+                                  ),
+                                  Flexible(
+                                    child: IconButton(
+                                      icon: Icon(Icons.check, size: 20),
+                                      onPressed: () =>
+                                          provider.saveEditChat(uid, chatId),
+                                    ),
+                                  ),
+                                  Flexible(
+                                    child: IconButton(
+                                      icon: Icon(Icons.close, size: 20),
+                                      onPressed: () =>
+                                          provider.cancelEditChat(),
+                                    ),
+                                  ),
+                                ],
+                              )
+                            : Text(title, style: TextStyle(fontSize: 14)),
                         subtitle: timestamp != null
                             ? Text(
                                 _formatTimestamp(timestamp),
@@ -196,19 +237,50 @@ class _StateHomescreen extends State<Homescreen> {
                               )
                             : null,
                         trailing: provider.deletingChatId == chatId
-                            ? Padding(
-                                padding: const EdgeInsets.all(10.0),
-                                child: SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(),
-                                ),
-                              )
-                            : IconButton(
-                                icon: Icon(Icons.delete_outline, size: 20),
-                                onPressed: () {
-                                  provider.deleteChat(uid, chatId);
-                                  // Navigator.pop(context);
+                            ? CircularProgressIndicator()
+                            : PopupMenuButton(
+                                itemBuilder: (context) => [
+                                  PopupMenuItem(
+                                    value: "edit",
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.center,
+                                      children: [
+                                        Text(
+                                          Textconstant.txt_edit,
+                                          style: TextStyle(fontSize: 15),
+                                        ),
+                                        Icon(Icons.edit, size: 20),
+                                      ],
+                                    ),
+                                  ),
+                                  PopupMenuItem(
+                                    // onTap: () {
+                                    // },
+                                    value: "delete",
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.center,
+                                      children: [
+                                        Text(
+                                          Textconstant.txt_delete,
+                                          style: TextStyle(fontSize: 15),
+                                        ),
+                                        Icon(Icons.delete, size: 20),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                                onSelected: (val) {
+                                  if (val == "delete") {
+                                    provider.deleteChat(uid, chatId);
+                                  } else if (val == "edit") {
+                                    provider.startEditChat(chatId, title);
+                                  }
                                 },
                               ),
                         onTap: () {
@@ -598,7 +670,7 @@ class _StateHomescreen extends State<Homescreen> {
                 ),
               ],
             ),
-          SizedBox(height: 25),
+          SizedBox(height: 50),
         ],
       ),
     );
