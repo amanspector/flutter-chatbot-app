@@ -8,6 +8,7 @@ class Textconstant {
   static String txt_emailalreadyexists =
       "Email address already exists , try to login";
   static String txt_hellothere = "Hello there,";
+
   static String txt_howcanihelp = "How can i help you today ?";
   static String txt_getstarted = "Get Started";
   static String txt_welcomeback = "Welcome back";
@@ -18,7 +19,13 @@ class Textconstant {
   static String txt_edit = 'Edit';
   static String txt_delete = 'Delete';
   static String txt_newchat = 'New Chat';
+  static String txt_appname = 'Muiltlingo';
+  static String txt_heading1 = "Learn a new language daily";
+  static String txt_heading2 = "Speak with confidence";
+  static String txt_heading3 = "Learn at your own pace";
   static String txt_alreadyhaveanaccount = "already have an account ?";
   static String txt_donthaveaccount = "don't have an account ?";
   static String txt_notfound = "Not found";
+  static String txt_fasttrack = "Fast track";
+  static String txt_deepfocus = "Deep Focus";
 }

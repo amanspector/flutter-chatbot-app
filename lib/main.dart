@@ -2,6 +2,7 @@ import 'package:chatbot_app/appconstants/color_constant.dart';
 import 'package:chatbot_app/provider/cred_provider.dart';
 import 'package:chatbot_app/repository/gemini_repo.dart';
 import 'package:chatbot_app/screens/auth/authgate.dart';
+import 'package:chatbot_app/screens/onboarding/getStarted.dart';
 import 'package:chatbot_app/services/firebase_chat_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -41,7 +42,10 @@ class MyApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         title: 'Chatbot',
         theme: ThemeData(
-          textTheme: TextTheme(),
+          textTheme: TextTheme(
+            bodyLarge: TextStyle(fontSize: 30, fontWeight: FontWeight.bold),
+            bodyMedium: TextStyle(fontSize: 20),
+          ),
           fontFamily: 'InstrumentSerif',
           brightness: Brightness.dark,
           colorScheme: ColorScheme.fromSeed(
@@ -50,7 +54,7 @@ class MyApp extends StatelessWidget {
             seedColor: Colors.transparent,
           ),
         ),
-        home: Authgate(),
+        home: Getstarted(),
       ),
     );
   }
